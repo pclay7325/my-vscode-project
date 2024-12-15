@@ -1,20 +1,55 @@
-from sqlalchemy import Column, Integer, String, create_engine
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, declarative_base
+from datetime import datetime
 
-# Database configuration
-DATABASE_URL = "sqlite:///./analytics.db"  # Adjust the URL if necessary
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+# Database connection string
+SQLALCHEMY_DATABASE_URL = "sqlite:///./analytics.db"  # Updated file name for clarity
+
+# Initialize database engine
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL, 
+    connect_args={"check_same_thread": False}  # Required for SQLite
+)
+
+# Session factory for database operations
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Base class for ORM models
 Base = declarative_base()
 
-# ProductionPerformance model
+# ProductionPerformance table for storing production performance data
 class ProductionPerformance(Base):
     __tablename__ = "production_performance"
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    machine = Column(String, nullable=False)  # Machine name
-    runtime_minutes = Column(Integer, nullable=False)  # Runtime (minutes)
-    planned_time_minutes = Column(Integer, nullable=False)  # Planned Time (minutes)
-    good_units = Column(Integer, nullable=False)  # Good Units produced
-    total_units = Column(Integer, nullable=False)  # Total Units produced
-    downtime_minutes = Column(Integer, nullable=False)  # Downtime in minutes
+
+    id = Column(Integer, primary_key=True, index=True)
+    machine = Column(String, nullable=False)
+    runtime_minutes = Column(Float, nullable=False)
+    planned_time_minutes = Column(Float, nullable=False)
+    good_units = Column(Integer, nullable=False)
+    total_units = Column(Integer, nullable=False)
+    downtime_minutes = Column(Float, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+# UploadedFileLog table for tracking uploaded files
+class UploadedFileLog(Base):
+    __tablename__ = "uploaded_file_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    file_name = Column(String, nullable=False)
+    upload_date = Column(DateTime, nullable=False, default=datetime.utcnow)
+    status = Column(String, nullable=False)
+    processed_rows = Column(Integer, default=0)
+    skipped_rows = Column(Integer, default=0)
+    validation_errors = Column(String, nullable=True)  # Path to validation errors file
+
+# Function to initialize the database and create tables
+def init_db():
+    """
+    Initialize the database and create tables if they don't already exist.
+    """
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("Database tables created successfully.")
+    except Exception as e:
+        print(f"Error initializing database: {e}")
