@@ -79,16 +79,37 @@ async def upload_production_performance(
 ):
     """
     Upload production performance data file (CSV or Excel).
-    Requires a valid JWT token.
+    Supports flexible column names and requires a valid JWT token.
     """
     payload = decode_access_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    required_columns = ["machine", "runtime_minutes", "planned_time_minutes", "good_units", "total_units", "downtime_minutes"]
+    # Flexible column name mapping
+    column_mapping = {
+        "machine": ["Machine", "machine"],
+        "runtime_minutes": ["Runtime (Minutes)", "runtime_minutes"],
+        "planned_time_minutes": ["Planned Time (Minutes)", "planned_time_minutes"],
+        "good_units": ["Good Units", "good_units"],
+        "total_units": ["Total Units", "total_units"],
+        "downtime_minutes": ["Downtime (Minutes)", "downtime_minutes"]
+    }
+
+    def map_columns(df):
+        """Map flexible column names to the required schema."""
+        mapped_columns = {}
+        for required, variations in column_mapping.items():
+            for col in variations:
+                if col in df.columns:
+                    mapped_columns[required] = col
+                    break
+            else:
+                raise HTTPException(status_code=400, detail=f"Missing required column: {required}")
+        return df.rename(columns=mapped_columns)
 
     contents = await file.read()
     try:
+        # Parse the uploaded file
         if file.filename.endswith('.csv'):
             df = pd.read_csv(BytesIO(contents))
         elif file.filename.endswith('.xlsx'):
@@ -96,10 +117,8 @@ async def upload_production_performance(
         else:
             raise HTTPException(status_code=400, detail="Unsupported file type. Upload CSV or Excel files.")
 
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            raise HTTPException(status_code=400, detail=f"Missing required columns: {', '.join(missing_columns)}")
-
+        # Map columns and validate data
+        df = map_columns(df)
         for _, row in df.iterrows():
             new_record = ProductionPerformance(
                 machine=row["machine"],
@@ -132,6 +151,7 @@ def generate_report(format: str = "json", token: str = Depends(oauth2_scheme), d
     if not records:
         raise HTTPException(status_code=404, detail="No production performance data available.")
 
+    # Prepare report data
     data = [
         {
             "machine": r.machine,
@@ -160,7 +180,7 @@ def generate_report(format: str = "json", token: str = Depends(oauth2_scheme), d
         return StreamingResponse(
             stream,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": "attachment; filename=report.xlsx"},
+            headers={"Content-Disposition": "attachment; filename=report.xlsx"}
         )
     else:
         raise HTTPException(status_code=400, detail="Invalid format. Use 'json', 'csv', or 'excel'.")
