@@ -9,6 +9,7 @@ import pandas as pd
 from io import BytesIO
 from datetime import timedelta
 from fastapi.responses import StreamingResponse
+from docx import Document  # For DOCX report generation
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -138,10 +139,19 @@ async def upload_production_performance(
 # --------------------- REPORT GENERATION ENDPOINT ----------------------
 
 @app.get("/api/v1/reports", tags=["Reports"], summary="Generate production performance report")
-def generate_report(format: str = "json", token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+def generate_report(
+    format: str = "json",
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+):
     """
-    Generate production performance report as JSON, CSV, or Excel.
-    Requires a valid JWT token.
+    Generate production performance report as JSON, CSV, Excel, or DOCX.
+
+    **Available Formats**:
+    - `json`: Returns the report as JSON.
+    - `csv`: Downloads the report as a CSV file.
+    - `excel`: Downloads the report as an Excel file.
+    - `doc`: Downloads the report as a Word document (.docx).
     """
     payload = decode_access_token(token)
     if not payload:
@@ -151,7 +161,6 @@ def generate_report(format: str = "json", token: str = Depends(oauth2_scheme), d
     if not records:
         raise HTTPException(status_code=404, detail="No production performance data available.")
 
-    # Prepare report data
     data = [
         {
             "machine": r.machine,
@@ -165,6 +174,7 @@ def generate_report(format: str = "json", token: str = Depends(oauth2_scheme), d
     ]
 
     df = pd.DataFrame(data)
+
     if format == "json":
         return data
     elif format == "csv":
@@ -177,13 +187,31 @@ def generate_report(format: str = "json", token: str = Depends(oauth2_scheme), d
         with pd.ExcelWriter(stream, engine="xlsxwriter") as writer:
             df.to_excel(writer, index=False, sheet_name="Report")
         stream.seek(0)
-        return StreamingResponse(
-            stream,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": "attachment; filename=report.xlsx"}
-        )
+        return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                 headers={"Content-Disposition": "attachment; filename=report.xlsx"})
+    elif format == "doc":
+        document = Document()
+        document.add_heading("Production Performance Report", level=1)
+        table = document.add_table(rows=1, cols=len(df.columns))
+        table.style = 'Table Grid'
+
+        # Add headers
+        for i, column_name in enumerate(df.columns):
+            table.rows[0].cells[i].text = column_name
+
+        # Add data
+        for _, row in df.iterrows():
+            cells = table.add_row().cells
+            for i, value in enumerate(row):
+                cells[i].text = str(value)
+
+        stream = BytesIO()
+        document.save(stream)
+        stream.seek(0)
+        return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                 headers={"Content-Disposition": "attachment; filename=report.docx"})
     else:
-        raise HTTPException(status_code=400, detail="Invalid format. Use 'json', 'csv', or 'excel'.")
+        raise HTTPException(status_code=400, detail="Invalid format. Use 'json', 'csv', 'excel', or 'doc'.")
 
 # --------------------- ROOT ENDPOINT ----------------------
 
