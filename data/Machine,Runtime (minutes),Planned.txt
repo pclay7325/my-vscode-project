@@ -1,3 +1,0 @@
-Machine,Runtime (minutes),Planned Time (minutes),Good Units,Total Units,Downtime (minutes)
-Machine 1,420,480,750,800,50
-Machine 2,300,360,600,650,40

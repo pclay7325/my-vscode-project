@@ -13,7 +13,8 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=True, bind=engine)
 Base = declarative_base()
 
-# Model definitions
+# --------------------- EXISTING MODELS ----------------------
+
 class KPIRecord(Base):
     """
     Stores Key Performance Indicator (KPI) records for analytics.
@@ -91,6 +92,25 @@ class TableData(Base):
 
     # Relationship to parent table
     user_table = relationship("UserTable", back_populates="data")
+
+# --------------------- MISSING PRODUCTIONPERFORMANCE MODEL ----------------------
+
+class ProductionPerformance(Base):
+    """
+    Stores production performance data for analytics.
+    """
+    __tablename__ = "production_performance"
+
+    id = Column(Integer, primary_key=True, index=True)
+    machine = Column(String, nullable=False)
+    runtime_minutes = Column(Float, nullable=False)
+    planned_time_minutes = Column(Float, nullable=False)
+    good_units = Column(Integer, nullable=False)
+    total_units = Column(Integer, nullable=False)
+    downtime_minutes = Column(Float, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+# --------------------- TABLE CREATION ----------------------
 
 # Create all tables in the database
 Base.metadata.create_all(bind=engine)

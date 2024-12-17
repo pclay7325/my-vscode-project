@@ -1,12 +1,12 @@
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 
 # Database connection string
-SQLALCHEMY_DATABASE_URL = "sqlite:///./analytics.db"  # Updated file name for clarity
+SQLALCHEMY_DATABASE_URL = "sqlite:///./analytics.db"  # Updated for clarity
 
-# Initialize database engine
+# Initialize the database engine
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, 
     connect_args={"check_same_thread": False}  # Required for SQLite
@@ -18,7 +18,15 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # Base class for ORM models
 Base = declarative_base()
 
-# ProductionPerformance table for storing production performance data
+# User Table
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+
+# ProductionPerformance Table
 class ProductionPerformance(Base):
     __tablename__ = "production_performance"
 
@@ -31,7 +39,7 @@ class ProductionPerformance(Base):
     downtime_minutes = Column(Float, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-# UploadedFileLog table for tracking uploaded files
+# UploadedFileLog Table
 class UploadedFileLog(Base):
     __tablename__ = "uploaded_file_logs"
 
@@ -41,7 +49,19 @@ class UploadedFileLog(Base):
     status = Column(String, nullable=False)
     processed_rows = Column(Integer, default=0)
     skipped_rows = Column(Integer, default=0)
-    validation_errors = Column(String, nullable=True)  # Path to validation errors file
+    validation_errors = Column(String, nullable=True)
+
+# KPIRecord Table (Assumed Definition)
+class KPIRecord(Base):
+    __tablename__ = "kpi_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    file_id = Column(String, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    availability = Column(Float, nullable=False)
+    performance = Column(Float, nullable=False)
+    quality = Column(Float, nullable=False)
+    oee = Column(Float, nullable=False)
 
 # Function to initialize the database and create tables
 def init_db():
