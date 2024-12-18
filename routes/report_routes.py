@@ -1,10 +1,28 @@
-from fastapi import APIRouter, Query, Response
+from fastapi import APIRouter, Query, Response, Depends, HTTPException
 from sqlalchemy.orm import Session
-from database import SessionLocal, ProductionPerformance
+from backend.database.db import SessionLocal, ProductionPerformance  # Corrected import
 import pandas as pd
 from io import BytesIO
+import logging
 
+# Initialize logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Initialize router
 report_routes = APIRouter()
+
+# Dependency to get database session
+def get_db():
+    """
+    Dependency function to provide a database session.
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 
 @report_routes.get(
     "/generate-production-performance-report",
@@ -13,15 +31,15 @@ report_routes = APIRouter()
     description="Generate a production performance report and export it as JSON, CSV, or Excel."
 )
 async def generate_production_performance_report(
-    export_format: str = Query("json", description="Export format: 'json', 'csv', or 'excel'")
+    export_format: str = Query("json", description="Export format: 'json', 'csv', or 'excel'"),
+    db: Session = Depends(get_db)  # Use shared dependency
 ):
     """
     Generate a production performance report based on uploaded production data.
     """
-    session = SessionLocal()
     try:
         # Fetch all production performance records from the database
-        result = session.query(ProductionPerformance).all()
+        result = db.query(ProductionPerformance).all()
 
         # Convert data to a list of dictionaries
         report_data = [
@@ -69,8 +87,5 @@ async def generate_production_performance_report(
             }
 
     except Exception as e:
-        print(f"Error: {str(e)}")
-        return {"error": f"Failed to generate report: {str(e)}"}
-
-    finally:
-        session.close()
+        logger.error(f"Error generating report: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate report: {str(e)}")
